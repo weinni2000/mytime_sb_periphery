@@ -1,0 +1,41 @@
+# Side services for the schwarzes-brett Odoo (mytime_sb), run separately
+# from the Doodba stack:
+#   docker compose up -d valhalla
+#
+# Odoo (in Docker) reaches them via host.docker.internal, like n7m.
+name: mytime_sb_periphery
+
+services:
+  # Routing engine for travel-time search areas (bulletin_board_isochrone).
+  # The first start downloads the OSM extract and builds the routing tiles
+  # into ./valhalla/custom_files; later starts only serve them.
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8002:8002"
+    volumes:
+      - ./valhalla/custom_files:/custom_files
+    environment:
+      # Space separated list of .osm.pbf URLs to build the tiles from.
+      tile_urls: "https://download.geofabrik.de/europe/austria-latest.osm.pbf"
+      # Rebuild only when the extract changes (or force_rebuild=True).
+      use_tiles_ignore_pbf: "True"
+      force_rebuild: "False"
+      build_tar: "True"
+      build_admins: "True"
+      build_time_zones: "True"
+      # Elevation is only used for bicycle/pedestrian costing on slopes and
+      # adds several GB of downloads: off for now.
+      build_elevation: "False"
+      build_transit: "False"
+      # Keep the build within the WSL memory budget (shared with Odoo, n7m).
+      concurrency: "2"
+      server_threads: "2"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8002/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # The first tile build takes a while.
+      start_period: 60m
