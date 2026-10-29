@@ -1,0 +1,10 @@
+# Run in /home/weinni2000/schwarzes-brett/odoo/custom/src/mytime_sb_periphery
+
+# DEV
+./valhalla/rebuild.sh                 # download OSM data, build tiles, restart valhalla
+docker compose up -d valhalla         # start valhalla
+sync/sync_to_server.sh                # copy compose file + tiles to prod
+
+# PROD (ssh weinni2000@62.169.26.81)
+docker compose up -d valhalla         # start valhalla (only serves synced tiles)
+docker compose restart valhalla       # load new tiles after a sync

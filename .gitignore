@@ -3,3 +3,6 @@ valhalla/custom_files/
 valhalla/custom_files.previous/
 valhalla/downloads/
 valhalla/build/
+# Registry images and users.
+registry/data/
+registry/auth/

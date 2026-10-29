@@ -2,7 +2,8 @@
 # Copy the Valhalla routing server and the map tileserver to the remote host,
 # into the same paths as here. Only the files the running servers need are
 # sent: the OSM downloads, the merged region.osm.pbf and the unpacked tile
-# directory are skipped (Valhalla reads valhalla_tiles.tar).
+# directory are skipped (Valhalla reads valhalla_tiles.tar), and so are the
+# development-only build files (docker-compose.override.yml, rebuild.sh).
 #
 # Usage: sync/sync_to_server.sh [extra rsync options, e.g. --dry-run]
 set -eu
@@ -16,7 +17,6 @@ ssh "$REMOTE" mkdir -p "$SRC"
 rsync -avhR --partial --info=progress2 "$@" \
     "$SRC/./mytime_sb_periphery/docker-compose.yml" \
     "$SRC/./mytime_sb_periphery/README.md" \
-    "$SRC/./mytime_sb_periphery/valhalla/rebuild.sh" \
     "$SRC/./mytime_sb_periphery/valhalla/custom_files/valhalla.json" \
     "$SRC/./mytime_sb_periphery/valhalla/custom_files/valhalla_tiles.tar" \
     "$SRC/./mytime_sb_periphery/valhalla/custom_files/admins.sqlite" \

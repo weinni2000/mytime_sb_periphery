@@ -1,0 +1,74 @@
+# Development only, never synced to the server: builds the Valhalla tiles
+# from the Geofabrik downloads. Compose merges this file into
+# docker-compose.yml automatically; the services only run through
+# valhalla/rebuild.sh (profile "build").
+
+x-valhalla-env: &valhalla-env
+  # Never download: the merged extract comes from valhalla-data.
+  tile_urls: ""
+  build_tar: "True"
+  build_admins: "True"
+  build_time_zones: "True"
+  # Elevation is only used for bicycle/pedestrian costing on slopes and
+  # adds many GB of downloads: off for now.
+  build_elevation: "False"
+  build_transit: "False"
+  # Keep the build within the WSL memory budget (shared with Odoo, n7m).
+  concurrency: "2"
+  server_threads: "2"
+
+services:
+  # Build step 1: download the countries and merge them into one extract.
+  # Geofabrik country extracts overlap at the borders; osmium merge removes
+  # the duplicated objects, which Valhalla would otherwise route twice.
+  valhalla-data:
+    image: debian:bookworm-slim
+    profiles: ["build"]
+    restart: "no"
+    volumes:
+      - ./valhalla:/work
+    environment:
+      # Austria and all its neighbouring countries.
+      region_urls: >-
+        https://download.geofabrik.de/europe/austria-latest.osm.pbf
+        https://download.geofabrik.de/europe/germany-latest.osm.pbf
+        https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf
+        https://download.geofabrik.de/europe/slovakia-latest.osm.pbf
+        https://download.geofabrik.de/europe/hungary-latest.osm.pbf
+        https://download.geofabrik.de/europe/slovenia-latest.osm.pbf
+        https://download.geofabrik.de/europe/italy-latest.osm.pbf
+        https://download.geofabrik.de/europe/switzerland-latest.osm.pbf
+        https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        apt-get update -qq
+        apt-get install -y -qq osmium-tool curl ca-certificates > /dev/null
+        mkdir -p /work/downloads /work/build
+        for url in $$region_urls; do
+          file="/work/downloads/$${url##*/}"
+          echo "Downloading $$url"
+          # -z: only download when Geofabrik has a newer extract.
+          if [ -f "$$file" ]; then
+            curl -fsSL -z "$$file" -o "$$file" "$$url"
+          else
+            curl -fsSL -o "$$file" "$$url"
+          fi
+        done
+        echo "Merging extracts"
+        osmium merge --overwrite -o /work/build/region.osm.pbf /work/downloads/*.osm.pbf
+        ls -l /work/build/region.osm.pbf
+
+  # Build step 2: build the routing tiles next to the served ones, so the
+  # running server keeps answering until valhalla/rebuild.sh swaps them in.
+  valhalla-build:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    profiles: ["build"]
+    restart: "no"
+    volumes:
+      - ./valhalla/build:/custom_files
+    environment:
+      <<: *valhalla-env
+      use_tiles_ignore_pbf: "False"
+      force_rebuild: "True"
+      serve_tiles: "False"

@@ -1,96 +1,65 @@
 # Side services for the schwarzes-brett Odoo (mytime_sb), run separately
 # from the Doodba stack:
 #   docker compose up -d valhalla
+#   docker compose up -d registry registry-ui
+#
+# This file runs on the server and in development. The Valhalla build
+# services live in docker-compose.override.yml, which only exists in
+# development (compose loads it automatically there).
 #
 # Odoo (in Docker) reaches them via host.docker.internal, like n7m.
 name: mytime_sb_periphery
 
-x-valhalla-env: &valhalla-env
-  # Never download: the merged extract comes from valhalla-data.
-  tile_urls: ""
-  build_tar: "True"
-  build_admins: "True"
-  build_time_zones: "True"
-  # Elevation is only used for bicycle/pedestrian costing on slopes and
-  # adds many GB of downloads: off for now.
-  build_elevation: "False"
-  build_transit: "False"
-  # Keep the build within the WSL memory budget (shared with Odoo, n7m).
-  concurrency: "2"
-  server_threads: "2"
-
 services:
   # Routing engine for travel-time search areas (bulletin_board_isochrone).
-  # Serves the tiles in ./valhalla/custom_files, built by valhalla/rebuild.sh.
+  # Slim: the plain Valhalla image only serves the prebuilt tiles in
+  # ./valhalla/custom_files (valhalla.json, valhalla_tiles.tar, admins and
+  # timezones sqlite). It never downloads or builds anything; the tiles are
+  # built in development (valhalla/rebuild.sh) and synced to the server
+  # (sync/sync_to_server.sh).
   valhalla:
-    image: ghcr.io/valhalla/valhalla-scripted:latest
+    image: ghcr.io/valhalla/valhalla:latest
     restart: unless-stopped
+    command: ["valhalla_service", "/custom_files/valhalla.json", "2"]
     ports:
       - "127.0.0.1:8002:8002"
     volumes:
-      - ./valhalla/custom_files:/custom_files
-    environment:
-      <<: *valhalla-env
-      use_tiles_ignore_pbf: "True"
-      force_rebuild: "False"
+      - ./valhalla/custom_files:/custom_files:ro
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8002/status"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 5m
+      start_period: 2m
 
-  # Build step 1: download the countries and merge them into one extract.
-  # Geofabrik country extracts overlap at the borders; osmium merge removes
-  # the duplicated objects, which Valhalla would otherwise route twice.
-  valhalla-data:
-    image: debian:bookworm-slim
-    profiles: ["build"]
-    restart: "no"
+  # Private container registry for our own images (Docker Hub replacement).
+  # Users live in ./registry/auth/htpasswd, created by registry/add-user.sh.
+  registry:
+    image: registry:2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
     volumes:
-      - ./valhalla:/work
+      - ./registry/data:/var/lib/registry
+      - ./registry/auth:/auth:ro
     environment:
-      # Austria and all its neighbouring countries.
-      region_urls: >-
-        https://download.geofabrik.de/europe/austria-latest.osm.pbf
-        https://download.geofabrik.de/europe/germany-latest.osm.pbf
-        https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf
-        https://download.geofabrik.de/europe/slovakia-latest.osm.pbf
-        https://download.geofabrik.de/europe/hungary-latest.osm.pbf
-        https://download.geofabrik.de/europe/slovenia-latest.osm.pbf
-        https://download.geofabrik.de/europe/italy-latest.osm.pbf
-        https://download.geofabrik.de/europe/switzerland-latest.osm.pbf
-        https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf
-    entrypoint: ["/bin/sh", "-ec"]
-    command:
-      - |
-        apt-get update -qq
-        apt-get install -y -qq osmium-tool curl ca-certificates > /dev/null
-        mkdir -p /work/downloads /work/build
-        for url in $$region_urls; do
-          file="/work/downloads/$${url##*/}"
-          echo "Downloading $$url"
-          # -z: only download when Geofabrik has a newer extract.
-          if [ -f "$$file" ]; then
-            curl -fsSL -z "$$file" -o "$$file" "$$url"
-          else
-            curl -fsSL -o "$$file" "$$url"
-          fi
-        done
-        echo "Merging extracts"
-        osmium merge --overwrite -o /work/build/region.osm.pbf /work/downloads/*.osm.pbf
-        ls -l /work/build/region.osm.pbf
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: Registry
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
 
-  # Build step 2: build the routing tiles next to the served ones, so the
-  # running server keeps answering until valhalla/rebuild.sh swaps them in.
-  valhalla-build:
-    image: ghcr.io/valhalla/valhalla-scripted:latest
-    profiles: ["build"]
-    restart: "no"
-    volumes:
-      - ./valhalla/build:/custom_files
+  # Web UI for the registry. It proxies to the registry itself, so the
+  # registry needs no CORS headers.
+  registry-ui:
+    image: joxit/docker-registry-ui:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5080:80"
     environment:
-      <<: *valhalla-env
-      use_tiles_ignore_pbf: "False"
-      force_rebuild: "True"
-      serve_tiles: "False"
+      REGISTRY_TITLE: mytime registry
+      NGINX_PROXY_PASS_URL: http://registry:5000
+      SINGLE_REGISTRY: "true"
+      DELETE_IMAGES: "true"
+      SHOW_CONTENT_DIGEST: "true"
+    depends_on:
+      - registry
