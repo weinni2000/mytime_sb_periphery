@@ -1,0 +1,24 @@
+# Registry: https://docker.weingartmair.eu (UI + API, login required)
+# Run on the server in /home/weinni2000/schwarzes-brett/odoo/custom/src/mytime_sb_periphery
+# TLS/routing: ~/inverseproxy/dynamic.yaml (Traefik, /v2 -> :5000, rest -> UI :5080)
+
+# SERVER
+./registry/add-user.sh <user>                 # add/change user (then restart registry)
+docker compose up -d registry registry-ui     # start
+docker compose restart registry               # reload users
+docker compose logs -f registry               # logs
+sed -i '/^<user>:/d' registry/auth/htpasswd && docker compose restart registry   # remove user
+docker compose exec registry registry garbage-collect --delete-untagged /etc/docker/registry/config.yml   # free disk after deletes
+
+# CLIENT (any machine)
+docker login docker.weingartmair.eu
+docker tag myimage:latest docker.weingartmair.eu/myimage:latest
+docker push docker.weingartmair.eu/myimage:latest
+docker pull docker.weingartmair.eu/myimage:latest
+curl -u <user> https://docker.weingartmair.eu/v2/_catalog   # list images
+
+# NOTES
+# Back up registry/data and registry/auth (not in git).
+# Pushes >60s fail until Traefik readTimeout is raised in ~/inverseproxy/inverseproxy.yaml:
+#   --entrypoints.web-main.transport.respondingTimeouts.readTimeout=900s
+#   docker compose -p inverseproxy -f ~/inverseproxy/inverseproxy.yaml up -d   # all sites blip briefly

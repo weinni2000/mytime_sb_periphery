@@ -74,16 +74,16 @@ Private registry for our own images (`registry:2`) with a web UI
 ./registry/add-user.sh <user>                 # create/update a user (needs Docker)
 docker compose up -d registry registry-ui     # start (restart registry after adding users)
 
-docker login 127.0.0.1:5000
-docker tag myimage:latest 127.0.0.1:5000/myimage:latest
-docker push 127.0.0.1:5000/myimage:latest
+docker login docker.weingartmair.eu
+docker tag myimage:latest docker.weingartmair.eu/myimage:latest
+docker push docker.weingartmair.eu/myimage:latest
 ```
 
-- UI: <http://127.0.0.1:5080> (log in with the same user)
+- UI: <https://docker.weingartmair.eu> (log in with the same user)
+- On the server, Traefik (`~/inverseproxy/dynamic.yaml`) terminates TLS:
+  `/v2/...` goes to the registry on 127.0.0.1:5000, everything else to the
+  UI on 127.0.0.1:5080. Keep both ports bound to 127.0.0.1.
 - Images are stored in `registry/data/`, users in `registry/auth/htpasswd`;
   neither is committed.
 - Deleting a tag (UI or API) only removes the reference. To free disk space:
   `docker compose exec registry registry garbage-collect --delete-untagged /etc/docker/registry/config.yml`
-- Docker only accepts plain HTTP for localhost. To use the registry from
-  another machine, put it behind a TLS reverse proxy (Traefik/Caddy) and
-  change the port binding.
