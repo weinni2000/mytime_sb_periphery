@@ -1,2 +1,5 @@
 # Downloaded OSM extracts and generated routing tiles.
 valhalla/custom_files/
+valhalla/custom_files.previous/
+valhalla/downloads/
+valhalla/build/
