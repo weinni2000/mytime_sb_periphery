@@ -22,3 +22,10 @@ curl -u <user> https://docker.weingartmair.eu/v2/_catalog   # list images
 # Pushes >60s fail until Traefik readTimeout is raised in ~/inverseproxy/inverseproxy.yaml:
 #   --entrypoints.web-main.transport.respondingTimeouts.readTimeout=900s
 #   docker compose -p inverseproxy -f ~/inverseproxy/inverseproxy.yaml up -d   # all sites blip briefly
+
+
+WSL issue:
+grep -n credsStore ~/.docker/config.json        # probably "credsStore": "desktop.exe"
+cp ~/.docker/config.json ~/.docker/config.json.bak
+sed -i '/"credsStore"/d' ~/.docker/config.json
+docker login docker.weingartmair.eu -u weinni2000
