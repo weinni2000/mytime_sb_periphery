@@ -12,6 +12,7 @@ if [ ! -f valhalla/build/valhalla_tiles.tar ]; then
     echo "No valhalla_tiles.tar was built, keeping the current tiles." >&2
     exit 1
 fi
+valhalla/set_limits.sh valhalla/build/valhalla.json
 
 docker compose stop valhalla
 rm -rf valhalla/custom_files.previous

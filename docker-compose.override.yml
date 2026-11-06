@@ -18,6 +18,22 @@ x-valhalla-env: &valhalla-env
   server_threads: "2"
 
 services:
+  # Development: serve the tiles with the builder image, the Valhalla
+  # version they were built with (the server pulls the plain image). Plain
+  # valhalla_service reads valhalla.json as it is, so the limits of
+  # valhalla/set_limits.sh stay; the image's own start script would reset
+  # them. No curl in this image: the healthcheck uses Python.
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    pull_policy: never
+    entrypoint: []
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:8002/status", timeout=4)
+
   # Build step 1: download the countries and merge them into one extract.
   # Geofabrik country extracts overlap at the borders; osmium merge removes
   # the duplicated objects, which Valhalla would otherwise route twice.

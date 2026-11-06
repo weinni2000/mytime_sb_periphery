@@ -58,7 +58,10 @@ Two variants:
   downloaded or built there.
 - **Development (fat):** additionally `docker-compose.override.yml`, which
   compose loads automatically. It adds the build services that download the
-  OSM extracts and build the tiles. It is never synced to the server.
+  OSM extracts and build the tiles, and serves the tiles with the builder
+  image (`valhalla-scripted`, the version they were built with, never
+  pulled) running plain `valhalla_service`. It is never synced to the
+  server.
 
 Development:
 
@@ -89,6 +92,12 @@ defined in `docker-compose.override.yml`):
    `osmium merge` into `valhalla/build/region.osm.pbf`. The country extracts
    overlap at the borders; merging removes the duplicated roads.
 2. `valhalla-build` builds the routing tiles into `valhalla/build/`.
+
+3. `valhalla/set_limits.sh` raises the isochrone limits of the new
+   `valhalla.json` (up to 10 travel times per request instead of 4; Odoo
+   parameter `bulletin_board_isochrone.valhalla_max_contours`). Run it alone
+   on the served config after changing it: `valhalla/set_limits.sh &&
+   docker compose restart valhalla`.
 
 Then it stops the server, moves the served tiles to
 `valhalla/custom_files.previous/`, moves the new build to
