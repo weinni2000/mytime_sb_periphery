@@ -8,3 +8,16 @@ sync/sync_to_server.sh                # copy compose file + tiles to prod
 # PROD (ssh weinni2000@62.169.26.81)
 docker compose up -d valhalla         # start valhalla (only serves synced tiles)
 docker compose restart valhalla       # load new tiles after a sync
+
+
+cd ~/schwarzes-brett && export DOODBA_UMASK=0022
+# keep the old image for rollback, then put the new one under the name prod.yaml uses
+docker tag weinni2000/schwarzes-brett:20.0-prod weinni2000/schwarzes-brett:20.0-prod-rollback-2026-10-29
+docker tag docker.weingartmair.eu/weinni2000/schwarzes-brett:20.0-prod weinni2000/schwarzes-brett:20.0-prod
+
+docker compose -p schwarzes-brett-prod -f prod.yaml stop odoo
+for db in schwarzes-brett weingartmair; do
+  docker compose -p schwarzes-brett-prod -f prod.yaml run --rm -l traefik.enable=false odoo click-odoo-update -d $db
+done
+docker compose -p schwarzes-brett-prod -f prod.yaml up -d --no-deps odoo
+docker compose -p schwarzes-brett-prod -f prod.yaml logs --tail 50 odoo

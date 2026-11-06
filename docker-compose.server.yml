@@ -1,0 +1,12 @@
+# Server only (untracked): prod Odoo reaches Valhalla as http://valhalla:8002
+# on its compose network, without publishing the port.
+services:
+  valhalla:
+    networks:
+      default:
+      schwarzes-brett-prod:
+        aliases: [valhalla]
+networks:
+  schwarzes-brett-prod:
+    external: true
+    name: schwarzes-brett-prod_default
