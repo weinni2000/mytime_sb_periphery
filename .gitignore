@@ -6,3 +6,8 @@ valhalla/build/
 # Registry images and users.
 registry/data/
 registry/auth/
+# Local sitewarm executable, configuration and scan output.
+sitewarm/.bin/
+sitewarm/sitewarm.env
+sitewarm/reports/
+sitewarm/.run.lock

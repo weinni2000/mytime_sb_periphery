@@ -3,6 +3,47 @@
 Side services for the schwarzes-brett Odoo (`mytime_sb`), run separately
 from the Doodba stack.
 
+## CDN cache warming
+
+`sitewarm/` wraps the official [sitewarm CLI](https://github.com/sitewarm/sitewarm).
+Install the pinned release (1.0.2, verified against its published SHA-256),
+then pass your public sitemap URL:
+
+```bash
+./sitewarm/install.sh
+./sitewarm/warm.sh --dry-run https://your-domain.example/sitemap.xml
+./sitewarm/warm.sh https://your-domain.example/sitemap.xml
+```
+
+For repeated runs, copy `sitewarm/sitewarm.env.example` to
+`sitewarm/sitewarm.env`, set `SITEMAP_URL`, then run `./sitewarm/warm.sh`.
+It works from any directory. For cron, use the absolute script path:
+
+```cron
+0 5 * * * /home/weinni2000/schwarzes-brett/odoo/custom/src/mytime_sb_periphery/sitewarm/warm.sh
+```
+
+Defaults: two requests per second, two concurrent requests, desktop and mobile
+profiles, at most 1,000,000 allowed sitemap URLs, and a one-hour overall timeout.
+Nested sitemap indexes are followed and robots.txt is respected. Each URL/profile
+gets one warming attempt; set `SITEWARM_MAX_WAIT=30s` to retry MISS/STALE responses
+and verify cache hits. Timeout means an incomplete scan, not successful completion.
+Overlapping runs are skipped using `flock` (Linux/util-linux).
+
+Timestamped logs and JSON results are saved in `sitewarm/reports/`, including
+failed scans and partial results on interruption/timeout. Invalid configuration
+does not produce a JSON report. The script preserves the CLI's exit status: 0 is
+success, 1 is a failed scan, 2 is invalid configuration, and 130/143 is interruption.
+The default fail states include cache MISS and HTTP/network errors. BYPASS/DYNAMIC
+pages are reported but do not fail the run: warming cannot make them cacheable.
+Review the cache-state report rather than assuming a successful scan cached every
+page. Remove old reports periodically if scheduling regular runs.
+
+This requests sitemap pages, not all embedded images, CSS or JavaScript. Cloudflare
+must permit page caching for HTML to become a HIT. Warming from one machine does
+not populate every Cloudflare data center. Use anonymous public pages; authenticated
+pages, carts and personalized responses should keep their normal cache exclusions.
+
 ## Valhalla (routing / isochrones)
 
 Used by `bulletin_board_isochrone` for "search by travel time". Covers
