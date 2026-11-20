@@ -140,15 +140,28 @@ docker push docker.weingartmair.eu/myimage:latest
 
 ## Nominatim via ngrok
 
-`nominatim_expose/expose.sh` publishes the local n7m Nominatim (`n7m-web-1`,
-`localhost:8080`) through ngrok. Put the token in `nominatim_expose/.env`
-(`ngrok_api_token=<token>`, ignored by git), then run:
+`nominatim_expose/expose.py` publishes the local n7m Nominatim (`n7m-web-1`,
+`localhost:8080`) through ngrok and writes the new `<public URL>/api/v4/` to
+the `nominatim.url` system parameter of the prod `schwarzes-brett` database.
+Free ngrok URLs change on every start, so the parameter follows the tunnel.
 
-```bash
-./nominatim_expose/expose.sh
-curl -s localhost:4040/api/tunnels   # public URL
+`nominatim_expose/.env` (ignored by git) holds:
+
+```ini
+ngrok_api_token=<ngrok authtoken>
+sb_admin_api_key=<API key of the Odoo admin user>
+sb_url=https://schwarzes-brett.info
+sb_ip=62.169.26.81
 ```
 
-The API is under `<public URL>/api/v4/`. Free ngrok URLs change on every
-start, and scripted clients need the header `ngrok-skip-browser-warning: 1`.
-Extra arguments go to `ngrok http`, e.g. `--url=<reserved domain>`.
+Odoo is called through `sb_ip`, because the domain is behind Cloudflare. TLS
+is still verified against the domain name.
+
+```bash
+./nominatim_expose/expose.py                  # tunnel + update prod, Ctrl-C stops
+./nominatim_expose/expose.py --no-update      # tunnel only
+./nominatim_expose/expose.py -- --url=<reserved ngrok domain>
+```
+
+Browsers get ngrok's warning page unless they send the header
+`ngrok-skip-browser-warning: 1`; scripted clients such as Odoo are not affected.
