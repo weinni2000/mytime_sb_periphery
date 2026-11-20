@@ -137,3 +137,18 @@ docker push docker.weingartmair.eu/myimage:latest
   neither is committed.
 - Deleting a tag (UI or API) only removes the reference. To free disk space:
   `docker compose exec registry registry garbage-collect --delete-untagged /etc/docker/registry/config.yml`
+
+## Nominatim via ngrok
+
+`nominatim_expose/expose.sh` publishes the local n7m Nominatim (`n7m-web-1`,
+`localhost:8080`) through ngrok. Put the token in `nominatim_expose/.env`
+(`ngrok_api_token=<token>`, ignored by git), then run:
+
+```bash
+./nominatim_expose/expose.sh
+curl -s localhost:4040/api/tunnels   # public URL
+```
+
+The API is under `<public URL>/api/v4/`. Free ngrok URLs change on every
+start, and scripted clients need the header `ngrok-skip-browser-warning: 1`.
+Extra arguments go to `ngrok http`, e.g. `--url=<reserved domain>`.
